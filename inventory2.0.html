@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>MilkTea Inventory Management — Dashboard</title>
+  <style>
+    :root{
+      --bg:#0f1724; --card:#0b1220; --accent:#eead0e; --muted:#9aa4b2; --glass: rgba(255,255,255,0.04);
+      --success:#2ecc71; --danger:#ff6b6b; --soft:#122033;
+      --radius:14px; --padding:14px;
+    }
+    *{box-sizing:border-box}
+    body,html{height:100%;margin:0;font-family:Inter,Segoe UI,Roboto;color:#e6eef6;background:linear-gradient(180deg,#071024 0%, #0b1830 100%);}
+    
+    #welcomeScreen{position:fixed;top:0;left:0;right:0;bottom:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;transition:opacity .8s ease;}
+    #welcomeScreen h1{font-size:32px;color:var(--accent);margin:0 0 12px;}
+    #welcomeScreen p{color:var(--muted);font-size:15px}
+    
+    .app{display:grid;grid-template-columns:220px 1fr;height:100vh}
+    nav{background:var(--card);display:flex;flex-direction:column;padding:20px;gap:20px;border-right:1px solid rgba(255,255,255,0.05)}
+    nav h2{font-size:18px;color:var(--accent)}
+    nav button{display:flex;align-items:center;gap:10px;padding:12px;border:none;background:transparent;color:#e6eef6;font-size:14px;cursor:pointer;border-radius:var(--radius);transition:background .25s}
+    nav button:hover{background:rgba(255,255,255,0.05)}
+    
+    .panel-container{padding:20px;overflow:auto;}
+    .panel{background:var(--card);padding:20px;border-radius:var(--radius);margin-bottom:20px;box-shadow:0 6px 18px rgba(0,0,0,0.5);animation:fadeIn .6s ease both}
+    .panel h3{margin:0 0 12px;color:var(--accent);font-size:18px;display:flex;align-items:center;gap:8px}
+    .panel p{font-size:13px;color:var(--muted);margin-bottom:10px}
+    .form-row{display:flex;gap:8px;margin-bottom:10px}
+    input,select,button{padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:#eef;font-size:14px}
+    input::placeholder{color:#7d8793}
+    .btn{cursor:pointer;background:linear-gradient(90deg,var(--accent),#d19a03);border:none;color:#051022;font-weight:700;transition:transform .2s}
+    .btn:hover{transform:translateY(-2px)}
+    .list{display:flex;flex-direction:column;gap:8px;max-height:240px;overflow:auto;padding-right:6px}
+    .item{display:flex;justify-content:space-between;gap:10px;padding:10px;border-radius:10px;background:var(--glass);align-items:center;transition:background .2s;cursor:pointer}
+    .item:hover{background:rgba(255,255,255,0.08)}
+    .badge{font-size:12px;padding:6px 8px;border-radius:8px;background:rgba(0,0,0,0.25)}
+    
+    table{width:100%;border-collapse:collapse;color:#e6eef6}
+    th,td{padding:10px;border-bottom:1px solid rgba(255,255,255,0.08);text-align:left;font-size:13px}
+    th{color:var(--muted);font-weight:600}
+
+    @keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  </style>
+</head>
+<body>
+  <div id="welcomeScreen">
+    <h1>Welcome to MilkTea Inventory</h1>
+    <p>Managing your shop made easy — FIFO & LIFO in one system</p>
+  </div>
+  
+  <div class="app" style="display:none">
+    <nav>
+      <h2>Dashboard</h2>
+      <button onclick="showPanel('inventory')">📦 Inventory</button>
+      <button onclick="showPanel('special')">🥤 Special Stock</button>
+      <button onclick="showPanel('customers')">👥 Customer Queue</button>
+      <button onclick="showPanel('employees')">🕒 Employee Logs</button>
+      <button onclick="showPanel('transactions')">💳 Transactions</button>
+    </nav>
+    <div class="panel-container">
+      <div id="inventory" class="panel">
+        <h3>📦 Inventory</h3>
+        <p>Add, manage, and sell stock using FIFO/LIFO.</p>
+        <div class="form-row">
+          <input id="batchName" placeholder="Item name" />
+          <input id="batchQty" placeholder="Qty" type="number" />
+          <input id="batchNote" placeholder="Note" />
+          <button id="addBatchBtn" class="btn">Add Batch</button>
+        </div>
+        <select id="sellMethod"><option value="fifo">FIFO</option><option value="lifo">LIFO</option></select>
+        <div id="inventoryList" class="list"></div>
+      </div>
+      <div id="special" class="panel" style="display:none">
+        <h3>🥤 Special Stock</h3>
+        <p>LIFO stack for promo/special items.</p>
+        <div class="form-row">
+          <input id="specialName" placeholder="Name" />
+          <input id="specialQty" placeholder="Qty" type="number" />
+          <button id="pushSpecial" class="btn">Push</button>
+          <button id="popSpecial" class="btn">Pop</button>
+        </div>
+        <div id="specialList" class="list"></div>
+      </div>
+      <div id="customers" class="panel" style="display:none">
+        <h3>👥 Customer Queue</h3>
+        <p>FIFO queue for customers.</p>
+        <div class="form-row">
+          <input id="custName" placeholder="Name" />
+          <input id="custOrder" placeholder="Order" />
+          <button id="enqueueCust" class="btn">Enqueue</button>
+          <button id="dequeueCust" class="btn">Dequeue</button>
+        </div>
+        <div id="customerList" class="list"></div>
+      </div>
+      <div id="employees" class="panel" style="display:none">
+        <h3>🕒 Employee Logs</h3>
+        <p>LIFO stack of employee time logs.</p>
+        <div class="form-row">
+          <input id="empName" placeholder="Employee" />
+          <select id="empAction"><option value="in">Clock In</option><option value="out">Clock Out</option></select>
+          <button id="pushEmp" class="btn">Push Log</button>
+          <button id="popEmp" class="btn">Pop Log</button>
+        </div>
+        <div id="empList" class="list"></div>
+      </div>
+      <div id="transactions" class="panel" style="display:none">
+        <h3>💳 Transactions</h3>
+        <p>View actions in FIFO or LIFO order.</p>
+        <button id="viewOldest" class="btn">Oldest First</button>
+        <button id="viewNewest" class="btn">Newest First</button>
+        <table id="transactionsTable"><thead><tr><th>Time</th><th>Type</th><th>Details</th><th>Method</th></tr></thead><tbody></tbody></table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ====== Manual Array Operations ======
+    function manualPush(arr, value){ arr[arr.length] = value; return arr.length; }
+    function manualPop(arr){ if(arr.length===0)return; const last=arr[arr.length-1]; arr.length--; return last; }
+    function manualShift(arr){ if(arr.length===0)return; const f=arr[0]; for(let i=1;i<arr.length;i++){arr[i-1]=arr[i];} arr.length--; return f; }
+    function manualPeek(arr){ if(arr.length===0)return; return arr[arr.length-1]; }
+
+    // welcome screen logic
+    setTimeout(()=>{document.getElementById('welcomeScreen').style.opacity='0';setTimeout(()=>{document.getElementById('welcomeScreen').style.display='none';document.querySelector('.app').style.display='grid';},800)},1500);
+
+    // state
+    const STORAGE_KEY='milktea_demo_v2';
+    const state={inventory:[],specialStock:[],customerQueue:[],employeeLogs:[],transactions:[]};
+    function nowStr(){return new Date().toLocaleString();}
+    function save(){localStorage.setItem(STORAGE_KEY,JSON.stringify(state));}
+    function load(){const raw=localStorage.getItem(STORAGE_KEY);if(raw){Object.assign(state,JSON.parse(raw));}}
+
+    // renders
+    function renderInventory(){
+      const el=document.getElementById('inventoryList');el.innerHTML='';
+      state.inventory.forEach(b=>{
+        const div=document.createElement('div');div.className='item';
+        div.innerHTML=`<span>${b.name} (Qty:${b.qty})</span><span class='muted'>${b.note}</span>`;
+        div.onclick=()=>{ // SELL when clicking item
+          let qty=prompt(`Enter quantity to sell from ${b.name}:`);
+          if(!qty || isNaN(qty) || qty<=0){alert("Invalid quantity.");return;}
+          sell(b.name, qty, document.getElementById('sellMethod').value);
+        };
+        el.appendChild(div);
+      });
+    }
+    function renderSpecial(){const el=document.getElementById('specialList');el.innerHTML='';for(let i=state.specialStock.length-1;i>=0;i--){const s=state.specialStock[i];const div=document.createElement('div');div.className='item';div.textContent=`${s.name} x ${s.qty}`;el.appendChild(div);}}
+    function renderCustomers(){const el=document.getElementById('customerList');el.innerHTML='';state.customerQueue.forEach(c=>{const div=document.createElement('div');div.className='item';div.textContent=`${c.name}: ${c.order}`;el.appendChild(div);});}
+    function renderEmp(){const el=document.getElementById('empList');el.innerHTML='';for(let i=state.employeeLogs.length-1;i>=0;i--){const e=state.employeeLogs[i];const div=document.createElement('div');div.className='item';div.textContent=`${e.name} ${e.action} at ${e.time}`;el.appendChild(div);}}
+    function renderTransactions(order='oldest'){const tbody=document.querySelector('#transactionsTable tbody');tbody.innerHTML='';let arr=[...state.transactions];if(order==='newest')arr=arr.reverse();arr.forEach(tx=>{const tr=document.createElement('tr');tr.innerHTML=`<td>${tx.time}</td><td>${tx.type}</td><td>${tx.details}</td><td>${tx.method}</td>`;tbody.appendChild(tr);});}
+
+    function renderAll(){renderInventory();renderSpecial();renderCustomers();renderEmp();renderTransactions();}
+
+    // core ops with validation
+    function addBatch(n,q,note=''){
+      if(!n.trim()){alert("Item name is required.");return;}
+      if(!q || isNaN(q) || q<=0){alert("Enter a valid quantity.");return;}
+      const b={name:n.trim(),qty:+q,note:note.trim()};
+      manualPush(state.inventory,b);
+      manualPush(state.transactions,{time:nowStr(),type:'Add Batch',details:`${n} x${q}`,method:'manualPush'});
+      save();renderAll();
+    }
+
+    function sell(name,qty,method='fifo'){
+      let remain=+qty;if(isNaN(remain)||remain<=0){alert("Invalid qty.");return;}
+      let used=0;
+      if(method==='fifo'){
+        for(let i=0;i<state.inventory.length&&remain>0;i++){
+          const b=state.inventory[i];if(b.name===name){
+            const take=Math.min(remain,b.qty);b.qty-=take;remain-=take;used+=take;
+            if(b.qty<=0){for(let j=i;j<state.inventory.length-1;j++){state.inventory[j]=state.inventory[j+1];}state.inventory.length--;i--;}
+          }
+        }
+      }else{
+        for(let i=state.inventory.length-1;i>=0&&remain>0;i--){
+          const b=state.inventory[i];if(b.name===name){
+            const take=Math.min(remain,b.qty);b.qty-=take;remain-=take;used+=take;
+            if(b.qty<=0){state.inventory.length--;}
+          }
+        }
+      }
+      if(used>0){manualPush(state.transactions,{time:nowStr(),type:'Sell',details:`${used} ${name}`,method});}
+      else{alert("Not enough stock or item not found.");}
+      save();renderAll();
+    }
+
+    function pushSpecial(n,q){if(!n.trim()||!q||q<=0){alert("Fill all special stock fields.");return;}manualPush(state.specialStock,{name:n,qty:+q});manualPush(state.transactions,{time:nowStr(),type:'Special Push',details:`${n} x${q}`,method:'manualPush'});save();renderAll();}
+    function popSpecial(){if(state.specialStock.length===0){alert("No special stock.");return;}const it=manualPop(state.specialStock);manualPush(state.transactions,{time:nowStr(),type:'Special Pop',details:`${it.name}`,method:'manualPop'});save();renderAll();}
+    function enqueueCust(n,o){if(!n.trim()||!o.trim()){alert("Customer name and order required.");return;}manualPush(state.customerQueue,{name:n,order:o,time:nowStr()});manualPush(state.transactions,{time:nowStr(),type:'Enqueue Cust',details:`${n}`,method:'manualPush'});save();renderAll();}
+    function dequeueCust(){if(state.customerQueue.length===0){alert("No customers.");return;}const c=manualShift(state.customerQueue);manualPush(state.transactions,{time:nowStr(),type:'Dequeue Cust',details:c.name,method:'manualShift'});save();renderAll();}
+    function pushEmp(n,a){if(!n.trim()){alert("Employee name required.");return;}manualPush(state.employeeLogs,{name:n,action:a,time:nowStr()});manualPush(state.transactions,{time:nowStr(),type:'Emp Log Push',details:`${n} ${a}`,method:'manualPush'});save();renderAll();}
+    function popEmp(){if(state.employeeLogs.length===0){alert("No logs.");return;}const e=manualPop(state.employeeLogs);manualPush(state.transactions,{time:nowStr(),type:'Emp Log Pop',details:`${e.name}`,method:'manualPop'});save();renderAll();}
+
+    // UI bindings
+    document.getElementById('addBatchBtn').onclick=()=>{addBatch(batchName.value,batchQty.value,batchNote.value);batchName.value=batchQty.value=batchNote.value=''};
+    document.getElementById('pushSpecial').onclick=()=>{pushSpecial(specialName.value,specialQty.value)};
+    document.getElementById('popSpecial').onclick=popSpecial;
+    document.getElementById('enqueueCust').onclick=()=>{enqueueCust(custName.value,custOrder.value);custName.value=custOrder.value=''};
+    document.getElementById('dequeueCust').onclick=dequeueCust;
+    document.getElementById('pushEmp').onclick=()=>{pushEmp(empName.value,empAction.value);empName.value=''};
+    document.getElementById('popEmp').onclick=popEmp;
+    document.getElementById('viewOldest').onclick=()=>renderTransactions('oldest');
+    document.getElementById('viewNewest').onclick=()=>renderTransactions('newest');
+
+    function showPanel(id){document.querySelectorAll('.panel').forEach(p=>p.style.display='none');document.getElementById(id).style.display='block';}
+
+    load();renderAll();
+  </script>
+</body>
+</html>
